@@ -27,6 +27,7 @@ public class FixedConstraintLayout extends ViewGroup {
     private ImageView mImageView;
     private TextView mTitleView;
     private Button mActionButton;
+    private boolean isStretchMediaContainer;
 
     private float mDensity;
 
@@ -67,13 +68,15 @@ public class FixedConstraintLayout extends ViewGroup {
         addView(mActionButton);
     }
 
+    public void enableMediaStretch(boolean stretch) {
+        isStretchMediaContainer = stretch;
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         int width = getSize(widthMeasureSpec);
         int height = getSize(heightMeasureSpec);
-
-        mMediaContainer.measure(exactlySize(width), exactlySize((int) (width / 1.91)));
 
         int iconSize = (int) (height * 0.13);
         mIconView.measure(exactlySize(iconSize), exactlySize(iconSize));
@@ -82,6 +85,14 @@ public class FixedConstraintLayout extends ViewGroup {
         mTitleView.measure(exactlySize(titleWidth), exactlySize(iconSize));
 
         mActionButton.measure(exactlySize(width - dp2px(4)), exactlySize(dp2px(40)));
+
+        if (isStretchMediaContainer) {
+            int mediaHeight = height - mIconView.getMeasuredHeight() - mActionButton.getMeasuredHeight() - dp2px(4) * 2;
+            mMediaContainer.measure(exactlySize(width), exactlySize(mediaHeight));
+        } else {
+            mMediaContainer.measure(exactlySize(width), exactlySize((int) (width / 1.91)));
+        }
+
         setMeasuredDimension(widthMeasureSpec, heightMeasureSpec);
     }
 

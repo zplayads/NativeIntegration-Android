@@ -17,7 +17,9 @@ import com.yumi.android.sdk.ads.publish.enumbean.LayerErrorCode;
 import com.yumi.android.sdk.ads.publish.listener.IYumiNativeListener;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -31,23 +33,36 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class NativeHelper {
     private static final String TAG = "NativeHelper";
 
-    Activity mActivity;
+    private Activity mActivity;
 
-    FrameLayout mAdContainer;
+    private FrameLayout mAdContainer;
 
-    IYumiNativeListener mIYumiNativeListener;
+    private IYumiNativeListener mIYumiNativeListener;
 
     private YumiNative mNativeAd;
     private List<NativeContent> mAdContents;
+    private Set<NativeContent> mNeverShown;
+
+    private int mLastX, mLastY;
+    private int mLastWidth, mLastHeight;
+    private int mBackgroundColor;
+    private int mBatchCount = 1;
+    private boolean isDebugable;
+    private boolean isLoading;
+    private boolean enableStretch;
 
     public NativeHelper(@NonNull Activity activity,
                         @NonNull YumiNative nativeAd) {
+        mNeverShown = new HashSet<>();
         mActivity = activity;
         mNativeAd = nativeAd;
         mNativeAd.setNativeEventListener(new IYumiNativeListener() {
             @Override
             public void onLayerPrepared(List<NativeContent> list) {
+                isLoading = false;
                 mAdContents = list;
+                mNeverShown.clear();
+                mNeverShown.addAll(mAdContents);
                 if (mIYumiNativeListener != null) {
                     mIYumiNativeListener.onLayerPrepared(new ArrayList<>(list));
                 }
@@ -55,6 +70,7 @@ public class NativeHelper {
 
             @Override
             public void onLayerFailed(LayerErrorCode layerErrorCode) {
+                isLoading = false;
                 if (mIYumiNativeListener != null) {
                     mIYumiNativeListener.onLayerFailed(layerErrorCode);
                 }
@@ -69,56 +85,137 @@ public class NativeHelper {
         });
     }
 
+    public void setDebugable(boolean debugable) {
+        isDebugable = debugable;
+    }
+
     public void setNativeEventListener(IYumiNativeListener listener) {
         mIYumiNativeListener = listener;
     }
 
-    public void loadAd() {
+    public void setBackground(int color) {
+        mBackgroundColor = color;
         if (mAdContainer != null) {
-            if (mAdContainer.getParent() instanceof ViewGroup) {
-                ((ViewGroup) mAdContainer.getParent()).removeView(mAdContainer);
-            }
-            mAdContainer = null;
+            mAdContainer.setBackgroundColor(color);
         }
+    }
+
+    public void loadAd(int batchCount) {
+        if (isLoading) {
+            log("loadAd: already loading");
+            return;
+        }
+        isLoading = true;
+        if (batchCount > 1) {
+            mBatchCount = batchCount;
+        }
+
+        removeAdContainer(mAdContainer);
 
         if (mAdContents != null) {
             mAdContents.clear();
         }
 
-        mNativeAd.requestYumiNative(1);
+        mNeverShown.clear();
+        mNativeAd.requestYumiNative(batchCount);
     }
 
     public boolean isReady() {
         return mAdContents != null && !mAdContents.isEmpty();
     }
 
-    public void show(int x, int y, int width, int height) {
-        if (mAdContainer != null) {
-            mAdContainer.setVisibility(View.VISIBLE);
-            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) mAdContainer.getLayoutParams();
-            layoutParams.leftMargin = x;
-            layoutParams.topMargin = y;
-            layoutParams.width = width;
-            layoutParams.height = height;
-            mAdContainer.setLayoutParams(layoutParams);
+    public void enableStetch(boolean enable) {
+        enableStretch = enable;
+    }
+
+    public void setLocation(int x, int y, int width, int height) {
+        this.mLastX = x;
+        this.mLastY = y;
+        this.mLastWidth = width;
+        this.mLastHeight = height;
+    }
+
+    public void show() {
+        if (mAdContents == null || mAdContents.isEmpty()) {
+            log("show: ad contents is null or empty.");
             return;
         }
 
-        if (mAdContents == null || mAdContents.isEmpty()) {
-            Log.d(TAG, "no loaded ad contents");
+        if (mAdContainer == null) {
+            mAdContainer = newAdContainer(mAdContents.get(0));
+            addViewToContent(mAdContainer);
+        } else {
+            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) mAdContainer.getLayoutParams();
+            layoutParams.leftMargin = mLastX;
+            layoutParams.topMargin = mLastY;
+            layoutParams.width = mLastWidth;
+            layoutParams.height = mLastHeight;
+            mAdContainer.setLayoutParams(layoutParams);
+        }
+        mAdContainer.setVisibility(View.VISIBLE);
+
+        mNeverShown.remove(mAdContents.get(0));
+    }
+
+    public void showNext() {
+        removeAdContainer(mAdContainer);
+
+        if (mAdContents == null) {
+            loadAd(mBatchCount);
+            return;
+        }
+
+        removeDirtyContents(mAdContents, mNeverShown);
+
+        if (mAdContents.isEmpty()) {
+            loadAd(mBatchCount);
             return;
         }
 
         mAdContainer = newAdContainer(mAdContents.get(0));
-        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(width, height);
-        layoutParams.leftMargin = x;
-        layoutParams.topMargin = y;
-        mActivity.addContentView(mAdContainer, layoutParams);
+        addViewToContent(mAdContainer);
+        mAdContainer.setVisibility(View.VISIBLE);
+
+        mNeverShown.remove(mAdContents.get(0));
+    }
+
+    private void removeDirtyContents(List<NativeContent> adContents, Set<NativeContent> dirtyContents) {
+        List<NativeContent> dirtyContent = new ArrayList<>();
+        for (NativeContent adContent : adContents) {
+            if (dirtyContents.contains(adContent)) {
+                continue;
+            }
+            dirtyContent.add(adContent);
+        }
+        adContents.removeAll(dirtyContent);
+    }
+
+    private void addViewToContent(View content) {
+        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(mLastWidth, mLastHeight);
+        layoutParams.leftMargin = mLastX;
+        layoutParams.topMargin = mLastY;
+        mActivity.addContentView(content, layoutParams);
     }
 
     public void hide() {
         if (mAdContainer != null) {
-            mAdContainer.setVisibility(View.GONE);
+            mAdContainer.setVisibility(View.INVISIBLE);
+        }
+    }
+
+    public void remove() {
+        if (mAdContainer == null) {
+            return;
+        }
+        removeAdContainer(mAdContainer);
+        removeDirtyContents(mAdContents, mNeverShown);
+        mAdContainer = null;
+    }
+
+    private void removeAdContainer(View view) {
+        if (view != null && view.getParent() instanceof ViewGroup) {
+            view.setVisibility(View.INVISIBLE);
+            ((ViewGroup) view.getParent()).removeView(view);
         }
     }
 
@@ -130,13 +227,16 @@ public class NativeHelper {
 
     private FrameLayout newAdContainer(NativeContent content) {
         FrameLayout adContainer = new FrameLayout(mActivity);
-
+        if ((mBackgroundColor & 0xFF000000) != 0) {
+            adContainer.setBackgroundColor(mBackgroundColor);
+        }
 
         YumiNativeAdView adView = new YumiNativeAdView(mActivity);
         FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         adView.setLayoutParams(layoutParams);
 
         FixedConstraintLayout adContentHolderView = new FixedConstraintLayout(mActivity);
+        adContentHolderView.enableMediaStretch(enableStretch);
         FrameLayout.LayoutParams adContentParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
         adContentHolderView.setLayoutParams(adContentParams);
         adView.addView(adContentHolderView);
@@ -149,11 +249,11 @@ public class NativeHelper {
         adView.setMediaLayout(adContentHolderView.getMediaContainer());
 
         if (content.getCoverImage() != null) {
-            Log.v(TAG, "content.getCoverImage().getDrawable()" + content.getCoverImage().getDrawable());
+            log("content.getCoverImage().getDrawable()" + content.getCoverImage().getDrawable());
             ((ImageView) adView.getCoverImageView()).setImageDrawable(content.getCoverImage().getDrawable());
         }
         if (content.getIcon() != null) {
-            Log.v(TAG, "content.getIconView().getDrawable()" + content.getIcon().getDrawable());
+            log("content.getIconView().getDrawable()" + content.getIcon().getDrawable());
             ((ImageView) adView.getIconView()).setImageDrawable(content.getIcon().getDrawable());
         }
         if (content.getTitle() != null) {
@@ -169,6 +269,12 @@ public class NativeHelper {
         adContainer.setClickable(true);
         adContainer.addView(adView);
         return adContainer;
+    }
+
+    private void log(String msg) {
+        if (isDebugable) {
+            Log.d(TAG, "log: " + msg);
+        }
     }
 
 }

@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
-import android.widget.FrameLayout;
 
 import com.yumi.android.sdk.ads.formats.YumiNativeAdOptions;
 import com.yumi.android.sdk.ads.publish.NativeContent;
@@ -24,14 +23,11 @@ public class MainActivity extends AppCompatActivity {
     NativeHelper mNativeHelper;
     private float mDensity;
 
-    FrameLayout mRootView;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mDensity = getResources().getDisplayMetrics().density;
         setContentView(R.layout.activity_main);
-        mRootView = findViewById(R.id.root_view);
 
         // TODO: 请求测试环境广告，正式发版请删掉这行代码
         YumiDebug.runInDebugMode(true);
@@ -50,22 +46,43 @@ public class MainActivity extends AppCompatActivity {
 
         // "cocos" 工具类, 位置：app/libs/yumiads-helper-0.1.0.jar
         mNativeHelper = new NativeHelper(this, nativeAd);
+
+        // 原生广告位置信息
+        int x = dp2px(100);
+        int y = dp2px(100);
+        int width = dp2px(250);
+        int height = dp2px(300);
+
+        // 展示加载好的广告
+        mNativeHelper.setLocation(x, y, width, height);
+        mNativeHelper.setDebugable(true);
+        mNativeHelper.setBackground(0xffffffff);
+        mNativeHelper.enableStetch(false);
+        mNativeHelper.setNativeEventListener(new IYumiNativeListener() {
+            @Override
+            public void onLayerPrepared(List<NativeContent> list) {
+                Log.d(TAG, "onLayerPrepared: ");
+            }
+
+            @Override
+            public void onLayerFailed(LayerErrorCode layerErrorCode) {
+                Log.d(TAG, "onLayerFailed: ");
+            }
+
+            @Override
+            public void onLayerClick() {
+                Log.d(TAG, "onLayerClick: ");
+            }
+        });
     }
 
     public void loadAd(View view) {
         // 加载 1 个原生广告，如果有正在展示的广告，会先移除正在展示的广告
-        mNativeHelper.loadAd();
+        mNativeHelper.loadAd(2);
     }
 
     public void show(View view) {
-        // 原生广告位置信息
-        int x = dp2px(20);
-        int y = dp2px(100);
-        int width = dp2px(300);
-        int height = dp2px(250);
-
-        // 展示加载好的广告
-        mNativeHelper.show(x, y, width, height);
+        mNativeHelper.show();
     }
 
     public void hide(View view) {
@@ -89,5 +106,13 @@ public class MainActivity extends AppCompatActivity {
             // 在不用广告时（Activity 退出时），销毁 Helper 类
             mNativeHelper.destroy();
         }
+    }
+
+    public void showNext(View view) {
+        mNativeHelper.showNext();
+    }
+
+    public void remove(View view) {
+        mNativeHelper.remove();
     }
 }
