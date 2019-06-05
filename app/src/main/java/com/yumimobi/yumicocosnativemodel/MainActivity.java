@@ -57,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
         mNativeHelper.setLocation(x, y, width, height);
         mNativeHelper.setDebugable(true);
         mNativeHelper.setBackground(0xffffffff);
-        mNativeHelper.enableStetch(false);
+        mNativeHelper.enableStretch(false);
         mNativeHelper.setNativeEventListener(new IYumiNativeListener() {
             @Override
             public void onLayerPrepared(List<NativeContent> list) {
@@ -86,6 +86,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void hide(View view) {
+
         // 隐藏正在展示的广告
         mNativeHelper.hide();
     }

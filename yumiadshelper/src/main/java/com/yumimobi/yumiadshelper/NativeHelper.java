@@ -93,10 +93,16 @@ public class NativeHelper {
         mIYumiNativeListener = listener;
     }
 
-    public void setBackground(int color) {
+    public void setBackground(final int color) {
         mBackgroundColor = color;
         if (mAdContainer != null) {
-            mAdContainer.setBackgroundColor(color);
+            mActivity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    mAdContainer.setBackgroundColor(color);
+
+                }
+            });
         }
     }
 
@@ -124,7 +130,7 @@ public class NativeHelper {
         return mAdContents != null && !mAdContents.isEmpty();
     }
 
-    public void enableStetch(boolean enable) {
+    public void enableStretch(boolean enable) {
         enableStretch = enable;
     }
 
@@ -136,47 +142,57 @@ public class NativeHelper {
     }
 
     public void show() {
-        if (mAdContents == null || mAdContents.isEmpty()) {
-            log("show: ad contents is null or empty.");
-            return;
-        }
+        mActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (mAdContents == null || mAdContents.isEmpty()) {
+                    log("show: ad contents is null or empty.");
+                    return;
+                }
 
-        if (mAdContainer == null) {
-            mAdContainer = newAdContainer(mAdContents.get(0));
-            addViewToContent(mAdContainer);
-        } else {
-            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) mAdContainer.getLayoutParams();
-            layoutParams.leftMargin = mLastX;
-            layoutParams.topMargin = mLastY;
-            layoutParams.width = mLastWidth;
-            layoutParams.height = mLastHeight;
-            mAdContainer.setLayoutParams(layoutParams);
-        }
-        mAdContainer.setVisibility(View.VISIBLE);
+                if (mAdContainer == null) {
+                    mAdContainer = newAdContainer(mAdContents.get(0));
+                    addViewToContent(mAdContainer);
+                } else {
+                    FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) mAdContainer.getLayoutParams();
+                    layoutParams.leftMargin = mLastX;
+                    layoutParams.topMargin = mLastY;
+                    layoutParams.width = mLastWidth;
+                    layoutParams.height = mLastHeight;
+                    mAdContainer.setLayoutParams(layoutParams);
+                }
+                mAdContainer.setVisibility(View.VISIBLE);
 
-        mNeverShown.remove(mAdContents.get(0));
+                mNeverShown.remove(mAdContents.get(0));
+            }
+        });
     }
 
     public void showNext() {
-        removeAdContainer(mAdContainer);
+        mActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                removeAdContainer(mAdContainer);
 
-        if (mAdContents == null) {
-            loadAd(mBatchCount);
-            return;
-        }
+                if (mAdContents == null) {
+                    loadAd(mBatchCount);
+                    return;
+                }
 
-        removeDirtyContents(mAdContents, mNeverShown);
+                removeDirtyContents(mAdContents, mNeverShown);
 
-        if (mAdContents.isEmpty()) {
-            loadAd(mBatchCount);
-            return;
-        }
+                if (mAdContents.isEmpty()) {
+                    loadAd(mBatchCount);
+                    return;
+                }
 
-        mAdContainer = newAdContainer(mAdContents.get(0));
-        addViewToContent(mAdContainer);
-        mAdContainer.setVisibility(View.VISIBLE);
+                mAdContainer = newAdContainer(mAdContents.get(0));
+                addViewToContent(mAdContainer);
+                mAdContainer.setVisibility(View.VISIBLE);
 
-        mNeverShown.remove(mAdContents.get(0));
+                mNeverShown.remove(mAdContents.get(0));
+            }
+        });
     }
 
     private void removeDirtyContents(List<NativeContent> adContents, Set<NativeContent> dirtyContents) {
