@@ -1,7 +1,6 @@
 package com.yumimobi.yumiadshelper;
 
 import android.app.Activity;
-import android.graphics.Rect;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import android.view.View;
@@ -33,7 +32,6 @@ public class NativeHelper {
     private static final String TAG = "NativeHelper";
 
     Activity mActivity;
-    Rect mAdContainerRect;
 
     FrameLayout mAdContainer;
 
@@ -43,10 +41,8 @@ public class NativeHelper {
     private List<NativeContent> mAdContents;
 
     public NativeHelper(@NonNull Activity activity,
-                        @NonNull YumiNative nativeAd,
-                        @NonNull Rect adRect) {
+                        @NonNull YumiNative nativeAd) {
         mActivity = activity;
-        mAdContainerRect = adRect;
         mNativeAd = nativeAd;
         mNativeAd.setNativeEventListener(new IYumiNativeListener() {
             @Override
@@ -96,9 +92,15 @@ public class NativeHelper {
         return mAdContents != null && !mAdContents.isEmpty();
     }
 
-    public void show() {
+    public void show(int x, int y, int width, int height) {
         if (mAdContainer != null) {
             mAdContainer.setVisibility(View.VISIBLE);
+            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) mAdContainer.getLayoutParams();
+            layoutParams.leftMargin = x;
+            layoutParams.topMargin = y;
+            layoutParams.width = width;
+            layoutParams.height = height;
+            mAdContainer.setLayoutParams(layoutParams);
             return;
         }
 
@@ -108,9 +110,9 @@ public class NativeHelper {
         }
 
         mAdContainer = newAdContainer(mAdContents.get(0));
-        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(mAdContainerRect.width(), mAdContainerRect.height());
-        layoutParams.topMargin = mAdContainerRect.top;
-        layoutParams.leftMargin = mAdContainerRect.left;
+        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(width, height);
+        layoutParams.leftMargin = x;
+        layoutParams.topMargin = y;
         mActivity.addContentView(mAdContainer, layoutParams);
     }
 

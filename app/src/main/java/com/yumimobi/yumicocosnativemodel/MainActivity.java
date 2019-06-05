@@ -1,7 +1,6 @@
 package com.yumimobi.yumicocosnativemodel;
 
 import android.graphics.Color;
-import android.graphics.Rect;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -49,33 +48,8 @@ public class MainActivity extends AppCompatActivity {
                 .setHideAdAttribution(false).build();
         YumiNative nativeAd = new YumiNative(this, SLOT, nativeAdOptions);
 
-        // 原生广告位置信息
-        int adRectLeft = dp2px(20); // x
-        int adRectTop = dp2px(100); // y
-        int adRectRight = dp2px(320); // x + width
-        int adRectBottom = dp2px(350); // y + height
-        Rect location = new Rect(adRectLeft, adRectTop, adRectRight, adRectBottom);
-
         // "cocos" 工具类, 位置：app/libs/yumiads-helper-0.1.0.jar
-        mNativeHelper = new NativeHelper(this, nativeAd, location);
-
-        // （可选项）如果需要监听广告加载状态
-        mNativeHelper.setNativeEventListener(new IYumiNativeListener() {
-            @Override
-            public void onLayerPrepared(List<NativeContent> list) {
-                Log.d(TAG, "onLayerPrepared: " + list);
-            }
-
-            @Override
-            public void onLayerFailed(LayerErrorCode layerErrorCode) {
-                Log.d(TAG, "onLayerFailed: " + layerErrorCode);
-            }
-
-            @Override
-            public void onLayerClick() {
-                Log.d(TAG, "onLayerClick: ");
-            }
-        });
+        mNativeHelper = new NativeHelper(this, nativeAd);
     }
 
     public void loadAd(View view) {
@@ -84,8 +58,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void show(View view) {
+        // 原生广告位置信息
+        int x = dp2px(20);
+        int y = dp2px(100);
+        int width = dp2px(300);
+        int height = dp2px(250);
+
         // 展示加载好的广告
-        mNativeHelper.show();
+        mNativeHelper.show(x, y, width, height);
     }
 
     public void hide(View view) {
@@ -97,7 +77,6 @@ public class MainActivity extends AppCompatActivity {
         // 判断是否有加载好的广告
         Log.d(TAG, "isReady: " + mNativeHelper.isReady());
     }
-
 
     private int dp2px(int dp) {
         return (int) (dp * mDensity);
