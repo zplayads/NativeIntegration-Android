@@ -17,9 +17,8 @@ import com.yumi.android.sdk.ads.publish.enumbean.LayerErrorCode;
 import com.yumi.android.sdk.ads.publish.listener.IYumiNativeListener;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -40,29 +39,27 @@ public class NativeHelper {
     private IYumiNativeListener mIYumiNativeListener;
 
     private YumiNative mNativeAd;
-    private List<NativeContent> mAdContents;
-    private Set<NativeContent> mNeverShown;
+    private LinkedList<NativeContent> mAdContents;
+    private NativeContent mCurrentContent;
 
     private int mLastX, mLastY;
     private int mLastWidth, mLastHeight;
     private int mBackgroundColor;
     private int mBatchCount = 1;
     private boolean isDebugable;
-    private boolean isLoading;
     private boolean enableStretch;
+    private int mCacheThreshold = 1;
 
     public NativeHelper(@NonNull Activity activity,
                         @NonNull YumiNative nativeAd) {
-        mNeverShown = new HashSet<>();
+        mAdContents = new LinkedList<>();
         mActivity = activity;
         mNativeAd = nativeAd;
         mNativeAd.setNativeEventListener(new IYumiNativeListener() {
             @Override
             public void onLayerPrepared(List<NativeContent> list) {
-                isLoading = false;
-                mAdContents = list;
-                mNeverShown.clear();
-                mNeverShown.addAll(mAdContents);
+                mAdContents.addAll(list);
+                Log.d(TAG, "onLayerPrepared: contents size: " + mAdContents.size());
                 if (mIYumiNativeListener != null) {
                     mIYumiNativeListener.onLayerPrepared(new ArrayList<>(list));
                 }
@@ -70,7 +67,6 @@ public class NativeHelper {
 
             @Override
             public void onLayerFailed(LayerErrorCode layerErrorCode) {
-                isLoading = false;
                 if (mIYumiNativeListener != null) {
                     mIYumiNativeListener.onLayerFailed(layerErrorCode);
                 }
@@ -83,6 +79,14 @@ public class NativeHelper {
                 }
             }
         });
+    }
+
+    public void setCacheThreshold(int threshold) {
+        mCacheThreshold = threshold;
+    }
+
+    public void setLoadBatchCount(int batchCount) {
+        mBatchCount = batchCount < 1 ? 1 : batchCount;
     }
 
     public void setDebugable(boolean debugable) {
@@ -107,27 +111,13 @@ public class NativeHelper {
     }
 
     public void loadAd(int batchCount) {
-        if (isLoading) {
-            log("loadAd: already loading");
-            return;
-        }
-        isLoading = true;
-        if (batchCount > 1) {
-            mBatchCount = batchCount;
-        }
-
-        removeAdContainer(mAdContainer);
-
-        if (mAdContents != null) {
-            mAdContents.clear();
-        }
-
-        mNeverShown.clear();
-        mNativeAd.requestYumiNative(batchCount);
+        setLoadBatchCount(batchCount);
+        mNativeAd.requestYumiNative(mBatchCount);
     }
 
     public boolean isReady() {
-        return mAdContents != null && !mAdContents.isEmpty();
+        log("isReady: " + !mAdContents.isEmpty());
+        return !mAdContents.isEmpty();
     }
 
     public void enableStretch(boolean enable) {
@@ -150,8 +140,12 @@ public class NativeHelper {
                     return;
                 }
 
+                if (mCurrentContent == null) {
+                    mCurrentContent = mAdContents.peek();
+                }
+
                 if (mAdContainer == null) {
-                    mAdContainer = newAdContainer(mAdContents.get(0));
+                    mAdContainer = newAdContainer(mCurrentContent);
                     addViewToContent(mAdContainer);
                 } else {
                     FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) mAdContainer.getLayoutParams();
@@ -163,7 +157,6 @@ public class NativeHelper {
                 }
                 mAdContainer.setVisibility(View.VISIBLE);
 
-                mNeverShown.remove(mAdContents.get(0));
             }
         });
     }
@@ -174,36 +167,44 @@ public class NativeHelper {
             public void run() {
                 removeAdContainer(mAdContainer);
 
-                if (mAdContents == null) {
+                if (mAdContents == null || mAdContents.isEmpty()) {
+                    log("showNext contents is null or empty. execute: loadAd(" + mBatchCount + ")");
                     loadAd(mBatchCount);
                     return;
                 }
 
-                removeDirtyContents(mAdContents, mNeverShown);
+                if (mAdContents.peek() == mCurrentContent) {
+                    mAdContents.pop();
+                }
+
+                clearExpiredContents(mAdContents);
 
                 if (mAdContents.isEmpty()) {
+                    log("showNext: have not a ad to show, execute: loadAd(" + mBatchCount + ")");
                     loadAd(mBatchCount);
                     return;
+                } else if (mAdContents.size() <= mCacheThreshold) {
+                    log("showNext hit cache threshold(" + mCacheThreshold + "), execute: loadAd(" + mBatchCount + ")");
+                    loadAd(mBatchCount);
                 }
 
-                mAdContainer = newAdContainer(mAdContents.get(0));
+                mCurrentContent = mAdContents.peek();
+                mAdContainer = newAdContainer(mCurrentContent);
                 addViewToContent(mAdContainer);
                 mAdContainer.setVisibility(View.VISIBLE);
 
-                mNeverShown.remove(mAdContents.get(0));
             }
         });
     }
 
-    private void removeDirtyContents(List<NativeContent> adContents, Set<NativeContent> dirtyContents) {
-        List<NativeContent> dirtyContent = new ArrayList<>();
-        for (NativeContent adContent : adContents) {
-            if (dirtyContents.contains(adContent)) {
-                continue;
+    private void clearExpiredContents(List<NativeContent> contents) {
+        ArrayList<NativeContent> expiredContents = new ArrayList<>();
+        for (NativeContent content : contents) {
+            if (content.isExpired()) {
+                expiredContents.add(content);
             }
-            dirtyContent.add(adContent);
         }
-        adContents.removeAll(dirtyContent);
+        contents.removeAll(expiredContents);
     }
 
     private void addViewToContent(View content) {
@@ -223,9 +224,15 @@ public class NativeHelper {
         if (mAdContainer == null) {
             return;
         }
-        removeAdContainer(mAdContainer);
-        removeDirtyContents(mAdContents, mNeverShown);
-        mAdContainer = null;
+        mActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mAdContents.remove(mCurrentContent);
+                mCurrentContent = null;
+                removeAdContainer(mAdContainer);
+                mAdContainer = null;
+            }
+        });
     }
 
     private void removeAdContainer(View view) {
@@ -265,11 +272,9 @@ public class NativeHelper {
         adView.setMediaLayout(adContentHolderView.getMediaContainer());
 
         if (content.getCoverImage() != null) {
-            log("content.getCoverImage().getDrawable()" + content.getCoverImage().getDrawable());
             ((ImageView) adView.getCoverImageView()).setImageDrawable(content.getCoverImage().getDrawable());
         }
         if (content.getIcon() != null) {
-            log("content.getIconView().getDrawable()" + content.getIcon().getDrawable());
             ((ImageView) adView.getIconView()).setImageDrawable(content.getIcon().getDrawable());
         }
         if (content.getTitle() != null) {
