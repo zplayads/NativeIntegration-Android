@@ -7,10 +7,12 @@ import android.util.Log;
 import android.view.View;
 
 import com.yumi.android.sdk.ads.formats.YumiNativeAdOptions;
+import com.yumi.android.sdk.ads.publish.AdError;
 import com.yumi.android.sdk.ads.publish.NativeContent;
 import com.yumi.android.sdk.ads.publish.YumiDebug;
 import com.yumi.android.sdk.ads.publish.YumiNative;
-import com.yumi.android.sdk.ads.publish.enumbean.LayerErrorCode;
+import com.yumi.android.sdk.ads.publish.YumiSettings;
+import com.yumi.android.sdk.ads.publish.enumbean.ExpressAdSize;
 import com.yumi.android.sdk.ads.publish.listener.IYumiNativeListener;
 import com.yumimobi.yumiadshelper.NativeHelper;
 
@@ -23,6 +25,11 @@ public class MainActivity extends AppCompatActivity {
     NativeHelper mNativeHelper;
     private float mDensity;
 
+    private static final int YOUR_DESIRED_X_DP = 20;
+    private static final int YOUR_DESIRED_Y_DP = 20;
+    private static final int YOUR_DESIRED_WIDTH_DP = 360;
+    private static final int YOUR_DESIRED_HEIGHT_DP = 300;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -31,6 +38,13 @@ public class MainActivity extends AppCompatActivity {
 
         // TODO: 请求测试环境广告，正式发版请删掉这行代码
         YumiDebug.runInDebugMode(true);
+        YumiSettings.runInCheckPermission(true);
+
+        // 原生广告位置信息
+        int x = dp2px(YOUR_DESIRED_X_DP);
+        int y = dp2px(YOUR_DESIRED_Y_DP);
+        int width = dp2px(YOUR_DESIRED_WIDTH_DP);
+        int height = dp2px(YOUR_DESIRED_HEIGHT_DP);
 
         // 原生广告配置，接入文档位置：https://github.com/yumimobi/YumiMediationSDKDemo-Android/blob/master/docs/YumiMediationSDK%20for%20Android(zh-cn).md#%E5%8E%9F%E7%94%9F%E5%B9%BF%E5%91%8A
         YumiNativeAdOptions nativeAdOptions = new YumiNativeAdOptions.Builder()
@@ -41,17 +55,13 @@ public class MainActivity extends AppCompatActivity {
                 .setAdAttributionTextColor(Color.argb(255, 255, 255, 255))
                 .setAdAttributionBackgroundColor(Color.argb(90, 0, 0, 0))
                 .setAdAttributionTextSize(10)
+                // TODO: 广点通模板广告需要设置这个 setExpressAdSize() 方法，宽高单位是 dp
+                .setExpressAdSize(new ExpressAdSize(YOUR_DESIRED_WIDTH_DP, YOUR_DESIRED_HEIGHT_DP))
                 .setHideAdAttribution(false).build();
         YumiNative nativeAd = new YumiNative(this, SLOT, nativeAdOptions);
 
         // "cocos" 工具类, 位置：app/libs/yumiads-helper-0.1.0.jar
         mNativeHelper = new NativeHelper(this, nativeAd);
-
-        // 原生广告位置信息
-        int x = dp2px(100);
-        int y = dp2px(100);
-        int width = dp2px(250);
-        int height = dp2px(300);
 
         // 展示加载好的广告
         mNativeHelper.setLocation(x, y, width, height);
@@ -65,13 +75,28 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onLayerFailed(LayerErrorCode layerErrorCode) {
-                Log.d(TAG, "onLayerFailed: ");
+            public void onLayerFailed(AdError adError) {
+                Log.d(TAG, "onLayerFailed: " + adError);
             }
 
             @Override
             public void onLayerClick() {
                 Log.d(TAG, "onLayerClick: ");
+            }
+
+            @Override
+            public void onExpressAdRenderFail(NativeContent nativeContent, String s) {
+                Log.d(TAG, "onExpressAdRenderFail: ");
+            }
+
+            @Override
+            public void onExpressAdRenderSuccess(NativeContent nativeContent) {
+                Log.d(TAG, "onExpressAdRenderSuccess: ");
+            }
+
+            @Override
+            public void onExpressAdClosed(NativeContent nativeContent) {
+                Log.d(TAG, "onExpressAdClosed: ");
             }
         });
     }

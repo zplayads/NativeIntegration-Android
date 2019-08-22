@@ -29,6 +29,7 @@ dependencies {
     implementation 'com.android.support:appcompat-v7:28.0.0'
     testImplementation 'junit:junit:4.12'
 
-    implementation 'com.yumimobi.ads.mediation:admob:3.6.1'
-    implementation 'com.yumimobi.ads:mediation:3.6.1'
+    implementation 'com.yumimobi.ads.mediation:admob:4.2.0'
+    implementation 'com.yumimobi.ads.mediation:gdt:4.2.0'
+    implementation 'com.yumimobi.ads:mediation:4.2.0'
 }

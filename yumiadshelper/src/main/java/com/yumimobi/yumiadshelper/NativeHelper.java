@@ -3,6 +3,7 @@ package com.yumimobi.yumiadshelper;
 import android.app.Activity;
 import android.support.annotation.NonNull;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -11,9 +12,9 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.yumi.android.sdk.ads.formats.YumiNativeAdView;
+import com.yumi.android.sdk.ads.publish.AdError;
 import com.yumi.android.sdk.ads.publish.NativeContent;
 import com.yumi.android.sdk.ads.publish.YumiNative;
-import com.yumi.android.sdk.ads.publish.enumbean.LayerErrorCode;
 import com.yumi.android.sdk.ads.publish.listener.IYumiNativeListener;
 
 import java.util.ArrayList;
@@ -23,12 +24,6 @@ import java.util.List;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-
-/**
- * Description:
- * <p>
- * Created by lgd on 2019-05-23.
- */
 public class NativeHelper {
     private static final String TAG = "NativeHelper";
 
@@ -66,9 +61,9 @@ public class NativeHelper {
             }
 
             @Override
-            public void onLayerFailed(LayerErrorCode layerErrorCode) {
+            public void onLayerFailed(AdError adError) {
                 if (mIYumiNativeListener != null) {
-                    mIYumiNativeListener.onLayerFailed(layerErrorCode);
+                    mIYumiNativeListener.onLayerFailed(adError);
                 }
             }
 
@@ -76,6 +71,27 @@ public class NativeHelper {
             public void onLayerClick() {
                 if (mIYumiNativeListener != null) {
                     mIYumiNativeListener.onLayerClick();
+                }
+            }
+
+            @Override
+            public void onExpressAdRenderFail(NativeContent nativeContent, String s) {
+                if (mIYumiNativeListener != null) {
+                    mIYumiNativeListener.onExpressAdRenderFail(nativeContent, s);
+                }
+            }
+
+            @Override
+            public void onExpressAdRenderSuccess(NativeContent nativeContent) {
+                if (mIYumiNativeListener != null) {
+                    mIYumiNativeListener.onExpressAdRenderSuccess(nativeContent);
+                }
+            }
+
+            @Override
+            public void onExpressAdClosed(NativeContent nativeContent) {
+                if (mIYumiNativeListener != null) {
+                    mIYumiNativeListener.onExpressAdClosed(nativeContent);
                 }
             }
         });
@@ -125,10 +141,10 @@ public class NativeHelper {
     }
 
     public void setLocation(int x, int y, int width, int height) {
-        this.mLastX = x;
-        this.mLastY = y;
-        this.mLastWidth = width;
-        this.mLastHeight = height;
+        mLastX = x;
+        mLastY = y;
+        mLastWidth = width;
+        mLastHeight = height;
     }
 
     public void show() {
@@ -244,7 +260,7 @@ public class NativeHelper {
 
     public void destroy() {
         if (mNativeAd != null) {
-            mNativeAd.onDestroy();
+            mNativeAd.destroy();
         }
     }
 
@@ -255,37 +271,42 @@ public class NativeHelper {
         }
 
         YumiNativeAdView adView = new YumiNativeAdView(mActivity);
-        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        adView.setLayoutParams(layoutParams);
-
-        FixedConstraintLayout adContentHolderView = new FixedConstraintLayout(mActivity);
-        adContentHolderView.enableMediaStretch(enableStretch);
-        FrameLayout.LayoutParams adContentParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
-        adContentHolderView.setLayoutParams(adContentParams);
-        adView.addView(adContentHolderView);
-
-
-        adView.setTitleView(adContentHolderView.getTitleView());
-        adView.setIconView(adContentHolderView.getIconView());
-        adView.setCoverImageView(adContentHolderView.getImageView());
-        adView.setCallToActionView(adContentHolderView.getActionButton());
-        adView.setMediaLayout(adContentHolderView.getMediaContainer());
-
-        if (content.getCoverImage() != null) {
-            ((ImageView) adView.getCoverImageView()).setImageDrawable(content.getCoverImage().getDrawable());
-        }
-        if (content.getIcon() != null) {
-            ((ImageView) adView.getIconView()).setImageDrawable(content.getIcon().getDrawable());
-        }
-        if (content.getTitle() != null) {
-            ((TextView) adView.getTitleView()).setText(content.getTitle());
-        }
-        if (content.getCallToAction() != null) {
-            ((Button) adView.getCallToActionView()).setText(content.getCallToAction());
+        if (content.isExpressAdView()) {
+            adView.removeAllViews();
+            FrameLayout.LayoutParams videoViewLayout = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            videoViewLayout.gravity = Gravity.CENTER;
+            adView.addView(content.getExpressAdView(), videoViewLayout);
         } else {
-            (adView.getCallToActionView()).setVisibility(View.INVISIBLE);
-        }
+            FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            adView.setLayoutParams(layoutParams);
 
+            FixedConstraintLayout adContentHolderView = new FixedConstraintLayout(mActivity);
+            adContentHolderView.enableMediaStretch(enableStretch);
+            FrameLayout.LayoutParams adContentParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
+            adContentHolderView.setLayoutParams(adContentParams);
+            adView.addView(adContentHolderView);
+
+            adView.setTitleView(adContentHolderView.getTitleView());
+            adView.setIconView(adContentHolderView.getIconView());
+            adView.setCoverImageView(adContentHolderView.getImageView());
+            adView.setCallToActionView(adContentHolderView.getActionButton());
+            adView.setMediaLayout(adContentHolderView.getMediaContainer());
+
+            if (content.getCoverImage() != null) {
+                ((ImageView) adView.getCoverImageView()).setImageDrawable(content.getCoverImage().getDrawable());
+            }
+            if (content.getIcon() != null) {
+                ((ImageView) adView.getIconView()).setImageDrawable(content.getIcon().getDrawable());
+            }
+            if (content.getTitle() != null) {
+                ((TextView) adView.getTitleView()).setText(content.getTitle());
+            }
+            if (content.getCallToAction() != null) {
+                ((Button) adView.getCallToActionView()).setText(content.getCallToAction());
+            } else {
+                (adView.getCallToActionView()).setVisibility(View.INVISIBLE);
+            }
+        }
         adView.setNativeAd(content);
         adContainer.setClickable(true);
         adContainer.addView(adView);
